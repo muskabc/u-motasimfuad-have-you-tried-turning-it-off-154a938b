@@ -30,12 +30,28 @@ def check_gate(text: str) -> None:
     text.encode("utf-8")  # raises if not encodable
 
 
+def write_entry(out_dir: Path, line: str) -> None:
+    """Write via a temp file in the same directory, then rename atomically.
+
+    A plain write can leave a half-written entry.txt if the process dies
+    mid-write; renaming a fully written temp file means entry.txt is
+    either the old complete text or the new complete text, never a torn
+    mix. The temp name is unique per process so two runs cannot collide.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    tmp = out_dir / f".entry.txt.tmp-{os.getpid()}"
+    try:
+        tmp.write_text(line, encoding="utf-8")
+        os.replace(tmp, out_dir / "entry.txt")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def main() -> int:
     line = load_line()
     check_gate(line)
     out_dir = Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "entry.txt").write_text(line, encoding="utf-8")
+    write_entry(out_dir, line)
     return 0
 
 
